@@ -1,0 +1,145 @@
+from typing import Any
+import numpy as np
+from semantic_llm_interpreter.core.interpreter import SemanticInterpreter
+from semantic_llm_interpreter.interpreters.adapters import to_numpy, to_tensor_like, get_logits_tensor, HAS_TORCH
+
+class BaseSemanticInterpreter:
+    """
+    Framework-agnostic logic for the Semantic LLM Interpreter.
+    Acts as a middleware layer between the raw LLM logits and the sampling strategy.
+    """
+    def __init__(self, model, tokenizer=None, 
+                 selection_temperature=0.1, 
+                 interpreter_model=None,
+                 max_context_length=4096,
+                 lookahead_depth=None): # lookahead deprecated but kept for compat
+        """
+        Initialize the interpreter logic.
+
+        Args:
+            model: The underlying LLM (Torch or Keras).
+            tokenizer: The tokenizer for decoding logits to text.
+            selection_temperature (float): The target Standard Deviation of the semantic usage.
+                                           1.0 = Original Model Behavior.
+                                           <1.0 = Concentrate on Median Intent.
+                                           >1.0 = Flatten/Uniform semantics.
+            interpreter_model: Required embedding model (str or object).
+        """
+        self.model = model
+        self.tokenizer = tokenizer 
+        self.temperature = selection_temperature
+        
+        # Initialize the core Semantic Interpreter
+        self.interpreter = SemanticInterpreter(embedding_model=interpreter_model, max_context_length=max_context_length)
+
+    def _process_logits(self, logits_tensor, input_ids):
+        """
+        Interception Logic:
+        1. Analyze predictions (Candidates).
+        2. Calculate Semantic Alignment (Z-Scores).
+        3. Apply Penalty to separate 'Likelihood' changes from 'Meaning' changes.
+        """
+        # 1. Convert to Numpy for Analysis
+        logits_np = to_numpy(logits_tensor)
+        
+        # We only care about the *last* token's logits for next-token prediction
+        # Shape: (Batch, Seq_Len, Vocab) or (Batch, Vocab)
+        if logits_np.ndim == 3:
+            next_token_logits = logits_np[:, -1, :] # Batch x Vocab
+        else:
+            next_token_logits = logits_np # Assume Batch x Vocab
+            
+        # For simplicity, handle Batch Size = 1 for this prototype.
+        # Handling Batch > 1 with branching is complex (different branches per item).
+        current_logits = next_token_logits[0] 
+        
+        # Softmax
+        # Stability fix
+        exp_logits = np.exp(current_logits - np.max(current_logits))
+        probs = exp_logits / np.sum(exp_logits)
+        
+        # 2. Extract Candidates
+        # Get Top-K (e.g., 10)
+        top_k_indices = np.argsort(probs)[-10:][::-1]
+        top_k_probs = probs[top_k_indices]
+        
+        # Construct Candidate Dict { "TokenString": Prob }
+        # Requires Tokenizer! If no tokenizer, we can't do semantic PCA.
+        if not self.tokenizer:
+            # Fallback: Can't do semantic work without text.
+            return logits_tensor
+            
+        candidates = {}
+        for idx, p in zip(top_k_indices, top_k_probs):
+            token_str = self.tokenizer.decode([idx])
+            candidates[token_str] = p
+            
+        # 3. Median Temperature Adjustment (Quantile Normal)
+        
+        # Extract Context for Interpreter
+        # To handle "A/B/C/D" effectively, we need the preceding text.
+        # We assume self.tokenizer exists (it must for decoding tokens).
+        context_str = None
+        if self.tokenizer and input_ids is not None:
+            # Flatten batch for context extraction (assume Batch=1 or use first)
+            # input_ids shape might be (Batch, Seq)
+            current_ids = to_numpy(input_ids)
+            if current_ids.ndim == 2:
+                seq_ids = current_ids[0]
+            else:
+                seq_ids = current_ids
+                
+            # Take last N tokens to avoid overflowing BERT (512 limit usually).
+            # Candidate tokens are short, so let's allow ~256 tokens of context.
+            window = 256
+            if len(seq_ids) > window:
+                seq_ids = seq_ids[-window:]
+            
+            # Decode context
+            # Skip special tokens might be safer?
+            context_str = self.tokenizer.decode(seq_ids, skip_special_tokens=True)
+            
+            # Ensure we have a trailing space or delimiter if needed?
+            # Tokenizer usually handles this, but "Answer:" + "A" is fine.
+            
+        # Call Core Logic
+        z_scores_dict = self.interpreter.calculate_semantic_alignment(candidates, context=context_str)
+        
+        modified_logits = current_logits.copy()
+        
+        # New Standard Deviation Temperature Logic
+        # We model the distribution as N(0, T).
+        # The original distribution is effectively N(0, 1) in Z-space.
+        # To shift from N(0, 1) to N(0, T), we apply a weight:
+        # W(z) = exp( -z^2/2 * (1/T^2 - 1) )
+        
+        # Avoid division by zero
+        T = self.temperature
+        if T < 1e-4: T = 1e-4
+            
+        # If T=1, Scale=0 (No change)
+        # If T<1, Scale>0 (Penalty for outliers -> Concentration)
+        # If T>1, Scale<0 (Boost for outliers -> Flattening)
+        scale_factor = (1.0 / (T**2)) - 1.0
+        
+        for idx in top_k_indices:
+            token_str = self.tokenizer.decode([idx])
+            z = z_scores_dict.get(token_str, 0.0)
+            
+            # Application of the ratio of densities
+            adjustment = -0.5 * (z**2) * scale_factor
+            
+            modified_logits[idx] += adjustment
+            
+        # We do NOT apply global temperature scaling (div by T).
+        # The parameter T is specifically the Semantic Std Dev.
+        # The 'sampling' temperature is up to the user's external sampler.
+        
+        # Reconstruct Tensor (Batch, Vocab)
+        full_logits_np = logits_np.copy()
+        if logits_np.ndim == 3:
+             full_logits_np[0, -1, :] = modified_logits
+        else:
+             full_logits_np[0] = modified_logits
+             
+        return to_tensor_like(full_logits_np, logits_tensor)

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "semantic_llm_interpreter"
+version = "0.1.0"
+description = "A safety shell for LLMs that selects the median intent token using Dynamic PCA."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+  {name = "Median Shell Team", email = "dev@medianshell.ai"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "sentence-transformers",
+    "numpy",
+    "torch"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/medianshell/core"
+
+[tool.setuptools]
+packages = ["semantic_llm_interpreter"]
