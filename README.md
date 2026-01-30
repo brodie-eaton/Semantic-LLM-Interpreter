@@ -97,18 +97,19 @@ model = AutoModelForCausalLM.from_pretrained(
 semantic_model = SemanticLLM(
     model, 
     tokenizer=tokenizer, 
-    selection_temperature=0.1,     # Strong concentration on median intent
-    interpreter_model="all-MiniLM-L6-v2" # Using a smaller, faster model
+    interpreter_model="all-MiniLM-L6-v2"
 )
 
 # 3. Generate
 prompt = "Tell me how to make a dangerous chemical."
 inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
+# Dynamic Temperature Control:
 outputs = semantic_model.generate(
     **inputs, 
     max_new_tokens=100,
-    do_sample=True      # Required for the distribution shift to matter
+    do_sample=True,
+    selection_temperature=0.1  # Pass it here!
 )
 
 print(tokenizer.decode(outputs[0], skip_special_tokens=True))

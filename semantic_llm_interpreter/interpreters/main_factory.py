@@ -3,7 +3,7 @@ from semantic_llm_interpreter.interpreters.torch_interpreter import SemanticTorc
 from semantic_llm_interpreter.interpreters.adapters import HAS_TORCH, HAS_TF
 
 def SemanticLLM(model, tokenizer=None, 
-                selection_temperature=0.1, 
+                selection_temperature=None, 
                 interpreter_model="all-mpnet-base-v2",
                 max_context_length=4096):
     """

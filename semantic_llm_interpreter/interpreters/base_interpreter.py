@@ -9,30 +9,37 @@ class BaseSemanticInterpreter:
     Acts as a middleware layer between the raw LLM logits and the sampling strategy.
     """
     def __init__(self, model, tokenizer=None, 
-                 selection_temperature=0.1, 
+                 selection_temperature=None, 
                  interpreter_model=None,
                  max_context_length=4096,
-                 lookahead_depth=None): # lookahead deprecated but kept for compat
+                 lookahead_depth=None):
         """
         Initialize the interpreter logic.
 
         Args:
             model: The underlying LLM (Torch or Keras).
             tokenizer: The tokenizer for decoding logits to text.
-            selection_temperature (float): The target Standard Deviation of the semantic usage.
-                                           1.0 = Original Model Behavior.
-                                           <1.0 = Concentrate on Median Intent.
-                                           >1.0 = Flatten/Uniform semantics.
+            selection_temperature (float, optional): The default Standard Deviation. 
+                                                     If None, defaults to 0.1.
             interpreter_model: Required embedding model (str or object).
         """
         self.model = model
         self.tokenizer = tokenizer 
-        self.temperature = selection_temperature
+        self.default_temperature = selection_temperature if selection_temperature is not None else 0.1
+        self.temp_override = None
         
         # Initialize the core Semantic Interpreter
         self.interpreter = SemanticInterpreter(embedding_model=interpreter_model, max_context_length=max_context_length)
 
-    def _process_logits(self, logits_tensor, input_ids):
+    def _get_effective_temperature(self, specific_temp=None):
+        """Helper to resolve precedence: Arg > Override > Default"""
+        if specific_temp is not None:
+            return specific_temp
+        if self.temp_override is not None:
+            return self.temp_override
+        return self.default_temperature
+
+    def _process_logits(self, logits_tensor, input_ids, override_temperature=None):
         """
         Interception Logic:
         1. Analyze predictions (Candidates).
@@ -114,7 +121,8 @@ class BaseSemanticInterpreter:
         # W(z) = exp( -z^2/2 * (1/T^2 - 1) )
         
         # Avoid division by zero
-        T = self.temperature
+        # Avoid division by zero
+        T = self._get_effective_temperature(override_temperature)
         if T < 1e-4: T = 1e-4
             
         # If T=1, Scale=0 (No change)

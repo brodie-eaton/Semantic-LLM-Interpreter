@@ -9,7 +9,7 @@ class SemanticTorchInterpreter(nn.Module, BaseSemanticInterpreter):
     Wraps a huggingface/torch model to apply semantic control during the forward pass.
     """
     def __init__(self, model, tokenizer, 
-                 selection_temperature=0.1, 
+                 selection_temperature=None, 
                  interpreter_model=None,
                  max_context_length=4096):
         """
@@ -43,7 +43,10 @@ class SemanticTorchInterpreter(nn.Module, BaseSemanticInterpreter):
         # We need input_ids
         input_ids = kwargs.get('input_ids', args[0] if args else None)
         
-        new_logits = self._process_logits(logits, input_ids)
+        # Check for dynamic temperature
+        temp = kwargs.get('selection_temperature', None)
+        
+        new_logits = self._process_logits(logits, input_ids, override_temperature=temp)
         
         # Reconstruct Output
         if isinstance(outputs, tuple):
@@ -58,7 +61,18 @@ class SemanticTorchInterpreter(nn.Module, BaseSemanticInterpreter):
     def generate(self, *args, **kwargs):
         """
         Passthrough for generation. 
-        Note: Standard .generate() may bypass .forward() hooks depending on implementation.
-        For best results, use a generation loop that explicitly calls this wrapper's forward().
+        Supports dynamic `selection_temperature`.
         """
-        return self.model.generate(*args, **kwargs)
+        # Extract dynamic temperature if present
+        temp = kwargs.pop('selection_temperature', None)
+        
+        # Set override state if provided
+        if temp is not None:
+            self.temp_override = temp
+            
+        try:
+            return self.model.generate(*args, **kwargs)
+        finally:
+            # Always clean up override
+            if temp is not None:
+                self.temp_override = None
