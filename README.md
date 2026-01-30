@@ -44,7 +44,7 @@ To enforce "Semantic Consensus", we do not use the raw projection distances. Ins
 ```math
 Z_i = \Phi^{-1}(\text{CDF}(t_i))
 ```
-*Where $\Phi^{-1}$ is the probit function (inverse CDF of standard normal).*
+*Where `Φ⁻¹` is the probit function (inverse CDF of standard normal).*
 
 ![Quantile Mapping](assets/3_quantile_mapping.png)
 
