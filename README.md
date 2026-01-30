@@ -6,7 +6,8 @@ A semantic interpretation layer for Large Language Models that enforces "Semanti
 
 Installation:
 ```bash
-pip install semantic-llm-interpreter
+# Install directly from GitHub (Recommended for Research/Early Access)
+pip install git+https://github.com/brodie-eaton/Semantic-LLM-Interpreter.git
 ```
 
 ### Wrapping a Model
