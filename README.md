@@ -20,6 +20,9 @@ The Semantic LLM Interpreter treats language generation not as a probabilistic g
 ### 1. Semantic Space Projection
 We assume that at any branching point (disagreement), the candidate tokens lie on a low-dimensional "Intent Manifold".
 
+**Example Prompt:**
+> "The final season of the long-running show deviated significantly from the source material. Fan reception was..."
+
 1.  **Embed**: We project `Context + Candidate` into a high-dimensional space ($\mathbb{R}^{384}$) using `sentence-transformers`.
 2.  **PCA**: We identify the Principal Component ($PC_1$) that captures the maximum variance (conflict) between candidates.
 
