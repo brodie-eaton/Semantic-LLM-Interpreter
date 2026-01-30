@@ -1,9 +1,0 @@
-sentence-transformers
-torch
-numpy
-scikit-learn
-# Optional:
-tf-keras
-# Dev:
-pytest
-pytest-asyncio
