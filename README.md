@@ -33,7 +33,7 @@ This $PC_1$ axis (the red line) represents the "Axis of Meaning" for the current
 ---
 
 ### 2. The Semantic Line & Rank-Based Selection
-We project all candidates onto this 1D Semantic Axis. This linearizes the disagreement (e.g., "Refusal" on the left, "Compliance" on the right).
+We project all candidates onto this 1D Semantic Axis. This linearizes the disagreement (e.g., "negative" on the left, "positive" on the right).
 
 ![1D Semantic Line](assets/2_semantic_line_1d.png)
 
