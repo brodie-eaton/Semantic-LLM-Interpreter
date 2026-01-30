@@ -41,7 +41,9 @@ To enforce "Semantic Consensus", we do not use the raw projection distances. Ins
 1.  We calculate the cumulative probability mass of the sorted tokens.
 2.  We map these cumulative probabilities to Z-Scores on a Standard Normal Distribution ($\mathcal{N}(0, 1)$).
 
-$$ Z_i = \Phi^{-1}(CDF(t_i)) $$
+$$
+Z_i = \Phi^{-1}(CDF(t_i))
+$$
 *Where $\Phi^{-1}$ is the probit function (inverse CDF of standard normal).*
 
 ![Quantile Mapping](assets/3_quantile_mapping.png)
@@ -53,7 +55,9 @@ This ensures that the "Median Intent" (the token at 50% cumulative probability) 
 ### 3. Temperature Scaling
 Finally, we apply a "Selection Temperature" ($T$) to re-weight the probabilities based on their semantic position ($Z$). We basically impose a Gaussian Prior centered at the median.
 
-$$ P_{new}(t) \propto \exp\left(-\frac{1}{2} \left(\frac{Z_t}{T}\right)^2\right) $$
+$$
+P_{new}(t) \propto \exp\left(-\frac{1}{2} \left(\frac{Z_t}{T}\right)^2\right)
+$$
 
 *   **Low T (< 1.0)**: The curve becomes narrow. Probability mass is sucked towards $Z=0$ (The Median).
 *   **High T (> 1.0)**: The curve flattens. All tokens become equally likely regardless of semantic position.
