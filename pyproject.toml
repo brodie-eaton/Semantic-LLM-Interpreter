@@ -8,9 +8,9 @@ version = "0.1.0"
 description = "A safety shell for LLMs that selects the median intent token using Dynamic PCA."
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = {text = "Proprietary"}
 authors = [
-  {name = "Median Shell Team", email = "dev@medianshell.ai"}
+  {name = "AI Safety Business", email = "contact@aisafetybusiness.com"}
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
