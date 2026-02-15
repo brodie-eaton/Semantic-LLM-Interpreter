@@ -169,7 +169,13 @@ class BaseSemanticInterpreter:
         # To shift from N(0, 1) to N(0, T), we apply a weight:
         # W(z) = exp( -z^2/2 * (1/T^2 - 1) )
         
+<<<<<<< HEAD:package/semantic_llm_interpreter/interpreters/base_interpreter.py
         # Avoid division by zero (Handled by T < 1e-4 check above, but safe guard)
+=======
+        # Avoid division by zero
+        # Avoid division by zero
+        T = self._get_effective_temperature(override_temperature)
+>>>>>>> 424cbcc5a673e30b1750fa2cc256880850fc15fa:semantic_llm_interpreter/interpreters/base_interpreter.py
         if T < 1e-4: T = 1e-4
             
         # If T=1, Scale=0 (No change)

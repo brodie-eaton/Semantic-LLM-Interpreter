@@ -60,7 +60,11 @@ print(tokenizer.decode(outputs[0], skip_special_tokens=True))
 
 ## How It Works
 
+<<<<<<< HEAD:package/README.md
 The **Semantic LLM Interpreter** wraps your existing PyTorch model. During generation, it intercepts the model's logits (next-token predictions) and applies a mathematical adjustment based on the **Semantic Intent** of the top candidates.
+=======
+The **Semantic LLM Interpreter** wraps your existing PyTorch model. During generation, it intercepts the model's logits and applies temperature according to the **Semantic Intent** of the top candidates rather than their raw probabilities.
+>>>>>>> 424cbcc5a673e30b1750fa2cc256880850fc15fa:README.md
 
 1.  **Analyze**: It takes the Top-K tokens predicted by the model.
 2.  **Cluster**: It calculates the "Median Intent" (the central semantic meaning) of these tokens using Dynamic PCA on their embeddings.
@@ -71,7 +75,11 @@ The **Semantic LLM Interpreter** wraps your existing PyTorch model. During gener
 
 ## Additional Reading: Mathematical Theory
 
+<<<<<<< HEAD:package/README.md
 The Semantic LLM Interpreter treats language generation not as a probabilistic game of next-token prediction, but as a bounded selection process within a continuous semantic manifold.
+=======
+The Semantic LLM Interpreter treats language generation as an "election", where semantic ideas may be spread across multiple ways to word it, so that the modal token may not actually represent the overall intent of the AI's output.
+>>>>>>> 424cbcc5a673e30b1750fa2cc256880850fc15fa:README.md
 
 ### 1. Semantic Space Projection
 We assume that at any branching point (disagreement), the candidate tokens lie on a low-dimensional "Intent Manifold".
@@ -116,7 +124,11 @@ P_{new}(t) \propto \exp\left(-\frac{1}{2} \left(\frac{Z_t}{T}\right)^2\right)
 ```
 
 *   **Low T (< 1.0)**: The curve becomes narrow. Probability mass is sucked towards $Z=0$ (The Median).
+<<<<<<< HEAD:package/README.md
 *   **High T (> 1.0)**: The curve flattens. All tokens become equally likely regardless of semantic position.
+=======
+*   **High T (> 1.0)**: The curve flattens. Token probabilities are distributed so that each semantic idea gets equal weighting without just giving each token identical weight.
+>>>>>>> 424cbcc5a673e30b1750fa2cc256880850fc15fa:README.md
 
 ![Temperature Effect](assets/4_temperature_effect.png)
 
