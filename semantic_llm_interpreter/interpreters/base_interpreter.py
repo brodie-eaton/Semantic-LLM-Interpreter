@@ -46,6 +46,12 @@ class BaseSemanticInterpreter:
         2. Calculate Semantic Alignment (Z-Scores).
         3. Apply Penalty to separate 'Likelihood' changes from 'Meaning' changes.
         """
+        # 0. Early Exit for T=1 (Optimization)
+        # If T=1, we do nothing. Skip all computation.
+        T = self._get_effective_temperature(override_temperature)
+        if abs(T - 1.0) < 1e-6:
+             return logits_tensor
+
         # 1. Convert to Numpy for Analysis
         logits_np = to_numpy(logits_tensor)
         
@@ -77,9 +83,15 @@ class BaseSemanticInterpreter:
             return logits_tensor
             
         candidates = {}
+        candidate_ids = {} # Keep track of IDs for expansion
         for idx, p in zip(top_k_indices, top_k_probs):
             token_str = self.tokenizer.decode([idx])
             candidates[token_str] = p
+            candidate_ids[token_str] = idx
+            
+        # Hook for Lookahead/Branching
+        # Subclasses can extend the token strings (keys) based on future probabilities
+        candidates = self._expand_candidates(candidates, input_ids, candidate_ids)
             
         # 3. Median Temperature Adjustment (Quantile Normal)
         
@@ -113,6 +125,43 @@ class BaseSemanticInterpreter:
         z_scores_dict = self.interpreter.calculate_semantic_alignment(candidates, context=context_str)
         
         modified_logits = current_logits.copy()
+
+        # Case 1: T=0 (Strict Concentration / "Argmax" of Meaning)
+        # We want to force the Median Token (Z closest to 0).
+        if T < 1e-4:
+            # Find token with minimal absolute Z-score (The Median)
+            best_token = min(z_scores_dict, key=lambda k: abs(z_scores_dict[k]))
+            # Loop over Top-K and force logits
+            # We set the best token to a very high value (relative to others)
+            # and others to a very low value.
+            for idx in top_k_indices:
+                token_str = self.tokenizer.decode([idx])
+                if token_str == best_token:
+                    modified_logits[idx] = 100.0 # High confidence
+                else:
+                    modified_logits[idx] = -100.0 # Suppress others
+            
+            # Reconstruct Tensor (Batch, Vocab)
+            full_logits_np = logits_np.copy()
+            if logits_np.ndim == 3:
+                 full_logits_np[0, -1, :] = modified_logits
+            return to_tensor_like(full_logits_np, logits_tensor)
+
+        # Case 2: T=Infinity (Uniform Distribution)
+        # We want to flatten the distribution across the Top-K candidates.
+        # 1e4 is effectively infinity for float precision purposes here.
+        if T > 1e4: 
+            # Set all candidate logits to the average of their current logits
+            # This makes P(token) uniform for all tokens in the Top K.
+            avg_logit = np.mean([modified_logits[i] for i in top_k_indices])
+            for idx in top_k_indices:
+                modified_logits[idx] = avg_logit
+            
+            # Reconstruct Tensor (Batch, Vocab)
+            full_logits_np = logits_np.copy()
+            if logits_np.ndim == 3:
+                 full_logits_np[0, -1, :] = modified_logits
+            return to_tensor_like(full_logits_np, logits_tensor)
         
         # New Standard Deviation Temperature Logic
         # We model the distribution as N(0, T).
@@ -120,9 +169,7 @@ class BaseSemanticInterpreter:
         # To shift from N(0, 1) to N(0, T), we apply a weight:
         # W(z) = exp( -z^2/2 * (1/T^2 - 1) )
         
-        # Avoid division by zero
-        # Avoid division by zero
-        T = self._get_effective_temperature(override_temperature)
+        # Avoid division by zero (Handled by T < 1e-4 check above, but safe guard)
         if T < 1e-4: T = 1e-4
             
         # If T=1, Scale=0 (No change)
@@ -147,7 +194,12 @@ class BaseSemanticInterpreter:
         full_logits_np = logits_np.copy()
         if logits_np.ndim == 3:
              full_logits_np[0, -1, :] = modified_logits
-        else:
-             full_logits_np[0] = modified_logits
-             
         return to_tensor_like(full_logits_np, logits_tensor)
+
+    def _expand_candidates(self, candidates, input_ids, candidate_ids):
+        """
+        Hook for subclasses to expand candidates (e.g. Lookahead).
+        Default implementation returns candidates unchanged.
+        """
+        return candidates
+
